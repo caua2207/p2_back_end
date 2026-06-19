@@ -1,0 +1,221 @@
+		Entidades
+Clientes(Representa a pessoa responsável pela reserva ou hospedagem)
+IdCliente
+Cliente_nome
+Telefone
+CPF
+
+suíte(Representa os quartos disponíveis para hospedagem no motel)
+IdSuite
+Número
+Categoria
+ValorHora
+Status(disponível, Ocupada, Limpeza, Manutenção)
+
+Consumo(Representa a utilização de uma suíte por um cliente durante um período)
+idConsumo
+Descrição
+Quantidade
+ValorUnitario
+idHospedagem
+
+Hospedagem(Representa a utilização de uma suíte por cliente durante um período)
+IdHospedagem
+dataEntrada
+dataSaida
+Status
+valorTotal
+idCliente
+idSuite
+
+Pagamento(Representa os pagamentos realizados para quitar uma hospedagem)
+idPagamento
+valor
+formaPagamento
+status
+idHospedagem
+
+Restrições
+Atributo--------tipo-------Obrigatório-----Restrição
+Cliente:
+idCliente		Integer	Sim		Chave 			Primária
+nome			String(50)		Sim			Não pode ser vazio
+telefone		String(15)		Sim			Formato válido
+cpf			String(11)		Sim			Único
+--------------------------------------------------------------------------------------------
+Suíte
+idSuite			Integer			Sim			Chave Primária
+numero			Integer			Sim			Único
+categoria		String(30)		Sim			Não pode ser vazio
+valorHora		Decimal(10,2)		Sim			Maior que zero
+status			Enum			Sim			Disponível, Ocupada, Limpeza, Manutenção
+--------------------------------------------------------------------------------------------
+Hospedagem
+idHospedagem		Integer			Sim			Chave Primária
+dataEntrada		DateTime		Sim			Data válida
+dataSaida		DateTime		Não			Deve ser maior que dataEntrada
+status			Enum			Sim			Reservada, Check-in Realizado, Em Andamento, Finalizada, Cancelada
+valorTotal		Decimal(10,2)		Sim			Calculado pelo sistema
+idCliente		Integer			Sim			Chave Estrangeira
+idSuite			Integer			Sim			Chave Estrangeira
+--------------------------------------------------------------------------------------------
+Consumo
+idConsumo		Integer			Sim			Chave Primária
+descricao		String(100)		Sim			Não pode ser vazio
+quantidade		Integer			Sim			Maior que zero
+valorUnitario		Decimal(10,2)		Sim			Maior que zero
+idHospedagem		Integer			Sim			Chave Estrangeira
+
+--------------------------------------------------------------------------------------------
+Pagamento
+idPagamento		Integer			Sim			Chave Primária
+valor			Decimal(10,2)		Sim			Maior que zero
+formaPagamento		Enum			Sim			Dinheiro, PIX, Cartão Débito, Cartão Crédito
+status			Enum			Sim			Pendente, Confirmado, Cancelado
+idHospedagem		Integer			Sim			Chave Estrangeira
+--------------------------------------------------------------------------------------------
+					Relacionamentos
+
+	               	    Cliente <---> Hospedagem 1:N
+Cardinalidade: 1
+justificativa:
+Um cliente pode ter Várias hospedagens
+Cada Hospedagem pertence a apenas um cliente
+
+		            Suíte <---> Hospedagem 1:N
+Cardinalidade: 1
+justificativa:
+Uma suíte pode receber varias hospedagens ao longo do tempo
+uma hospedagem utiliza apenas uma suíte.
+
+		            Hospedagem <---> Consumo 1:N
+Cardinalidade: 1
+justificativa:
+Uma hospedagem pode possuir Vários consumos
+Cada consumo pertence a uma hospedagem
+
+		  	    Hospedagem <---> Pagamento 1:N
+Cardinalidade: 1
+justificativa:
+Uma hospedagem pode possuir um ou mais pagamentos
+Cada pagamento pertence a uma única hospedagem
+					Ciclo de vida
+Hospedagem
+Reservada ---> Check-in realizado ---> Em andamento ---> finalizada
+	estados alternativos
+Reservada ---> Cancelamento
+
+Suíte
+Disponível ---> Ocupada ---> Limpeza ---> Disponível
+			OU
+Disponível ---> Manutenção ---> disponível
+
+
+    			Regras de Negócio Dependentes de Estado
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+RN-001 – Suíte deve estar disponível para nova hospedagem
+Campo				      Descrição
+Identificador			    RN-001
+Nome				    Suíte disponível para hospedagem
+Gatilho			            Ao criar uma hospedagem
+Pré-condição			    A suíte deve possuir status "Disponível"
+Ação				    Permitir o cadastro da hospedagem e alterar a suíte para "Ocupada"
+Violação			    HTTP 400 - {"erro":"A suíte selecionada não está disponível para hospedagem"}
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+RN-002 – Check-out somente em hospedagem em andamento
+Identificador			    RN-002
+Nome				    Check-out válido
+Gatilho				    Ao solicitar check-out
+Pré-condição			    A hospedagem deve estar com status "Em Andamento"
+Ação				    Finalizar a hospedagem
+Violação			    HTTP 400 - {"erro":"Somente hospedagens em andamento podem realizar check-out.}"  
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+RN-003 – Suíte entra em limpeza após check-out
+Identificador			    RN-003
+Nome			  	    Atualização automática de status da suíte
+Gatilho				    Ao finalizar uma hospedagem
+Pré-condição			    Hospedagem finalizada com sucesso
+Ação				    Alterar automaticamente o status da suíte para "Limpeza"
+Violação			    HTTP 500 - {"erro": "Falha ao atualizar o status da suíte."}
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+RN-004 – Não permitir consumo em hospedagem encerrada
+Identificador			    RN-004
+Nome				    Registro de consumo permitido apenas em hospedagens ativas
+Gatilho				    Ao cadastrar consumo
+Pré-condição			    Hospedagem deve estar com status "Em Andamento"
+Ação				    Registrar o consumo na hospedagem
+Violação			    HTTP 400 - {"erro": "Não è permitido registrar consumo em hospedagens finalizadas ou canceladas."}
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+RN-005 – Pagamento somente após finalização da hospedagem
+Identificador			    RN-005
+Nome				    Confirmação de pagamento
+Gatilho				    Ao confirmar um pagamento
+Pré-condição			    Hospedagem deve estar com status "Finalizada"
+Ação				    Alterar status do pagamento para "Confirmado"
+Violação			    HTTP 400 - {"erro": "A hospedagem precisa estar finalizada para confirmar o pagamento."}
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+RN-006 – CPF do cliente deve ser único
+Identificador			    RN-006
+Nome				    CPF único
+Gatilho				    Ao cadastrar cliente
+Pré-condição			    Não existir outro cliente com o mesmo CPF
+Ação				    Salvar o cadastro do cliente
+Violação			    HTTP 409 - {"erro": "Já existe um cliente cadastrado com este CPF."}
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+RN-007 – Número da suíte deve ser único
+Identificador			    RN-007
+Nome				    Número único da suíte
+Gatilho				    Ao cadastrar suíte
+Pré-condição			    Não existir outra suíte com o mesmo número
+Ação				    Salvar o cadastro da suíte
+Violação			    HTTP 409 - {"erro": "Já existe uma suíte cadastrada com este número."}
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+RN-008 – Valor total da hospedagem deve ser calculado automaticamente
+Identificador			    RN-008
+Nome				    Cálculo automático da hospedagem
+Gatilho				    Ao finalizar hospedagem ou registrar consumo
+Pré-condição			    Existirem informações válidas de permanência e consumos
+Ação				    Calcular: (Horas de permanência × ValorHora da suíte) + Soma dos consumos
+Violação			    HTTP 500 - {"erro": "Falha no cálculo do valor total da hospedagem."}
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+RN-009 – Data de saída deve ser maior que a data de entrada
+Identificador			    RN-009
+Nome				    Validação de período de hospedagem
+Gatilho				    Ao registrar check-out
+Pré-condição			    Data de saída maior que data de entrada
+Ação				    Registrar a saída do cliente
+Violação			    HTTP 400 - {"erro": "A data de saída deve ser posterior à data de entrada."}
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+RN-010 – Pagamento não pode possuir valor igual ou inferior a zero
+Identificador			    RN-010
+Nome				    Valor de pagamento válido
+Gatilho				    Ao registrar pagamento
+Pré-condição			    Valor informado maior que zero
+Ação				    Registrar pagamento
+Violação			    HTTP 400 - {"erro": "O valor do pagamento deve ser maior que zero."}
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	    				Cálculo Derivado
+		 					     Valor total da Hospedagem
+
+Valor Total = (Horas de permanência x Valor suíte) + soma dos Consumos
+
+Exemplo:
+
+4 horas = R$ 120
+
+Consumos:
+Refrigerante = R$ 10
+Chocolate = R$15
+
+Total = 120 + 10 + 15
+
+Total = 145
+
+
+
+
+
+
+
+
+
